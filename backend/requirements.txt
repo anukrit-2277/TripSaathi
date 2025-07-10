@@ -1,0 +1,93 @@
+# ============================================================
+# TripSaathi - Multi-Agent RAG Travel Planner
+# ============================================================
+# NOTE ON VERSION PINNING:
+# We use compatible ranges (>=x.y,<z) instead of exact pins (==x.y.z)
+# to allow pip to resolve dependency conflicts between packages.
+# ChromaDB bundles its own FastAPI version requirement.
+# ============================================================
+
+# --- Web Framework ---
+# FastAPI: Modern async web framework with automatic OpenAPI docs.
+# Why FastAPI over Flask?
+#   - Built-in Pydantic validation (request/response models)
+#   - Async support out of the box (important for LLM calls)
+#   - Auto-generated Swagger UI at /docs
+#   - Type hints everywhere = fewer bugs
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0        # ASGI server to run FastAPI
+
+# --- Data Validation ---
+# Pydantic v2: Used by FastAPI for request/response schemas.
+# Also used for structured LLM outputs (agents return Pydantic models, not raw strings).
+pydantic>=2.11.0
+pydantic-settings>=2.9.0         # Load config from .env files with type safety
+
+# --- LLM & AI ---
+# LangChain: Framework for building LLM applications.
+# Why LangChain?
+#   - Abstracts away provider differences (swap Groq for OpenAI with 1 line)
+#   - Built-in prompt templates, output parsers, and chains
+#   - Ecosystem of integrations (vector stores, embeddings, tools)
+#
+# Interview Q: "What's the difference between LangChain and LangGraph?"
+# A: LangChain = building blocks (chains, prompts, parsers)
+#    LangGraph = orchestration layer (state machines, conditional routing, loops)
+#    LangGraph USES LangChain components but adds workflow control.
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+langchain-groq>=0.3.0            # Groq provider for LangChain
+
+# --- LangGraph ---
+# LangGraph: State machine framework for multi-agent orchestration.
+# Why LangGraph over a simple SequentialChain?
+#   - Supports conditional edges (critic can reject → loop back)
+#   - Typed shared state (TravelState flows through all nodes)
+#   - Prevents infinite loops with built-in controls
+#   - Can add human-in-the-loop checkpoints
+langgraph>=0.4.0
+
+# --- Embeddings ---
+# HuggingFace Embeddings: Runs locally, no API key needed.
+# Model: all-MiniLM-L6-v2 (384-dimensional vectors)
+# Why local embeddings?
+#   - Free (no API costs)
+#   - Fast (no network latency)
+#   - Privacy (data never leaves your machine)
+#   - Good enough quality for this use case
+sentence-transformers>=4.0.0
+langchain-huggingface>=0.2.0
+
+# --- Vector Store ---
+# ChromaDB: Lightweight vector database with persistence.
+# Why ChromaDB?
+#   - Simple API, easy to set up
+#   - Supports metadata filtering (filter by destination)
+#   - Persistent storage (survives restarts)
+#   - Good for demos and small-medium datasets
+#
+# Alternative: FAISS (Facebook AI Similarity Search)
+#   - Faster for large datasets but no built-in persistence
+#   - No metadata filtering
+chromadb>=1.0.0
+
+# --- Database ---
+# SQLAlchemy: Python ORM for database operations.
+# asyncpg: Async PostgreSQL driver.
+# Why ORM over raw SQL?
+#   - Type-safe queries
+#   - Migration support
+#   - Prevents SQL injection
+#   - Database-agnostic (can switch to SQLite for testing)
+sqlalchemy>=2.0.0
+asyncpg>=0.31.0                  # Async PostgreSQL driver
+alembic>=1.16.0                  # Database migrations (optional but good practice)
+
+# --- HTTP & Async ---
+httpx>=0.28.0                    # Async HTTP client (for testing and external APIs)
+python-dotenv>=1.1.0             # Load .env files
+
+# --- Testing ---
+pytest>=8.4.0
+pytest-asyncio>=1.0.0

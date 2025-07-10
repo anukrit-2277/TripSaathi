@@ -1,0 +1,49 @@
+# ============================================================
+# TripSaathi .gitignore
+# ============================================================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# --- Virtual Environment ---
+venv/
+.venv/
+env/
+
+# --- Environment Variables (SECRETS!) ---
+.env
+*.env.local
+
+# --- ChromaDB (Vector Store) ---
+# Generated embeddings — can be rebuilt from travel_data/
+chroma_db/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Node (Frontend) ---
+node_modules/
+frontend/dist/
+frontend/build/
+
+# --- Logs ---
+*.log
+
+# --- Testing ---
+.pytest_cache/
+htmlcov/
+.coverage
