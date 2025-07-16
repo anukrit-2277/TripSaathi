@@ -63,7 +63,11 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 TripSaathi starting up...")
     logger.info("📦 Initializing resources...")
 
-    # Phase 3: Initialize RAG pipeline here
+    # Initialize RAG pipeline (builds vector store on first run)
+    from app.rag.pipeline import build_vector_store
+    build_vector_store()
+    logger.info("✅ RAG pipeline initialized")
+
     # Phase 12: Initialize database connection here
 
     yield  # App is running and serving requests
@@ -135,4 +139,10 @@ async def root():
         "message": "Welcome to TripSaathi — Multi-Agent RAG Travel Planner",
         "docs": "/docs",
         "health": "/health",
+        "plan_trip": "/api/trip/plan",
     }
+
+
+# --- Register API Routers ---
+from app.api.routes.trips import router as trips_router
+app.include_router(trips_router)
