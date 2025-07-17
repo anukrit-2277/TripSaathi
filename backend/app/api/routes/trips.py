@@ -22,10 +22,13 @@ This separation means:
 """
 
 import uuid
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.trip import TripRequest, TripResponse, ErrorResponse
 from app.graph.workflow import run_travel_workflow
+from app.db.database import get_db
+from app.db import crud
 from app.core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -118,8 +121,31 @@ async def plan_trip(request: TripRequest) -> TripResponse:
             revision_count=result.get("revision_count", 0),
         )
 
-        # Store for later retrieval
+        # Store in memory (always available)
         _trip_store[trip_id] = response
+
+        # Also persist to database (if available)
+        try:
+            async for db in get_db():
+                await crud.create_trip(
+                    db=db,
+                    trip_id=trip_id,
+                    destination=request.destination,
+                    days=request.days,
+                    travelers=request.travelers,
+                    budget=request.budget,
+                    preferences=request.preferences,
+                    itinerary=itinerary,
+                    budget_breakdown=budget_breakdown,
+                    critique=result.get("critique", {}),
+                    total_estimated_cost=budget_breakdown.get("total_estimated", 0),
+                    within_budget=budget_breakdown.get("within_budget", False),
+                    status=result.get("status", "unknown"),
+                    revision_count=result.get("revision_count", 0),
+                )
+                break
+        except Exception as db_err:
+            logger.warning(f"⚠️ DB save failed (trip still returned): {db_err}")
 
         logger.info(
             f"✅ Trip plan generated. ID: {trip_id}, "
@@ -149,14 +175,40 @@ async def plan_trip(request: TripRequest) -> TripResponse:
 async def get_trip(trip_id: str) -> TripResponse:
     """
     Retrieve a previously generated trip by ID.
-    
-    Currently uses in-memory storage.
-    Phase 12 will replace this with PostgreSQL persistence.
+    Checks in-memory cache first, then falls back to database.
     """
+    # Check in-memory first
     trip = _trip_store.get(trip_id)
-    if trip is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Trip with ID '{trip_id}' not found",
-        )
-    return trip
+    if trip is not None:
+        return trip
+
+    # Try database
+    try:
+        async for db in get_db():
+            db_trip = await crud.get_trip_by_id(db, trip_id)
+            if db_trip:
+                response = TripResponse(
+                    trip_id=db_trip.id,
+                    destination=db_trip.destination,
+                    days=db_trip.days,
+                    travelers=db_trip.travelers,
+                    total_estimated_cost=db_trip.total_estimated_cost or 0,
+                    within_budget=db_trip.within_budget,
+                    itinerary=db_trip.itinerary or {},
+                    budget_breakdown=db_trip.budget_breakdown or {},
+                    critique=db_trip.critique or {},
+                    recommendations=(db_trip.itinerary or {}).get("recommendations", []),
+                    sources=[f"travel_data/{db_trip.destination.lower()}.md"],
+                    status=db_trip.status,
+                    revision_count=db_trip.revision_count,
+                )
+                _trip_store[trip_id] = response  # Cache it
+                return response
+            break
+    except Exception as e:
+        logger.warning(f"⚠️ DB lookup failed: {e}")
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"Trip with ID '{trip_id}' not found",
+    )

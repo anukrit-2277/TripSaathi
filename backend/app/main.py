@@ -68,12 +68,21 @@ async def lifespan(app: FastAPI):
     build_vector_store()
     logger.info("✅ RAG pipeline initialized")
 
-    # Phase 12: Initialize database connection here
+    # Initialize database
+    from app.db.database import init_db, close_db
+    try:
+        await init_db()
+        logger.info("✅ Database initialized")
+    except Exception as e:
+        logger.warning(f"⚠️ Database init skipped (run without DB): {e}")
 
     yield  # App is running and serving requests
 
     logger.info("🛑 TripSaathi shutting down...")
-    # Cleanup resources here
+    try:
+        await close_db()
+    except Exception:
+        pass
 
 
 # Create the FastAPI application
