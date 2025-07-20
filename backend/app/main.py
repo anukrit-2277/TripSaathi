@@ -104,14 +104,10 @@ app = FastAPI(
 # the React app from making API calls to FastAPI.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",   # Vite dev server
-        "http://localhost:3000",   # Create React App (fallback)
-        "http://127.0.0.1:5173",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],      # Allow all HTTP methods (GET, POST, etc.)
-    allow_headers=["*"],      # Allow all headers
+    allow_origins=["*"],           # Allow all origins in development
+    allow_credentials=False,       # No cookies/credentials needed for our API
+    allow_methods=["*"],           # Allow all HTTP methods (GET, POST, OPTIONS, etc.)
+    allow_headers=["*"],           # Allow all headers
 )
 
 
