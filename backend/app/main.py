@@ -69,23 +69,25 @@ async def lifespan(app: FastAPI):
     
     We'll add RAG pipeline initialization and DB setup here in later phases.
     """
-    logger.info("🚀 TripSaathi starting up...")
-    logger.info("📦 Initializing resources...")
+    logger.info("TripSaathi starting up...")
 
-    # Initialize RAG pipeline (builds vector store on first run)
-    from app.rag.pipeline import build_vector_store
-    build_vector_store()
-    logger.info("✅ RAG pipeline initialized")
-
-    # Initialize database
+    # Initialize database first (fast)
     from app.db.database import init_db, close_db
     try:
         await init_db()
-        logger.info("✅ Database initialized")
+        logger.info("Database initialized")
     except Exception as e:
-        logger.warning(f"⚠️ Database init skipped (run without DB): {e}")
+        logger.warning(f"Database init skipped: {e}")
 
-    yield  # App is running and serving requests
+    # Initialize RAG in background thread (embedding download can be slow)
+    import threading
+    def _init_rag():
+        from app.rag.pipeline import build_vector_store
+        build_vector_store()
+        logger.info("RAG pipeline initialized")
+    threading.Thread(target=_init_rag, daemon=True).start()
+
+    yield  # App is running — /health responds immediately
 
     logger.info("🛑 TripSaathi shutting down...")
     try:
