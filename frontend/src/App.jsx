@@ -19,7 +19,6 @@ function App() {
     setError(null);
     setCurrentStep(0);
 
-    // Simulate agent progress (since the API doesn't stream progress)
     const progressInterval = setInterval(() => {
       setCurrentStep((prev) => {
         if (prev < 3) return prev + 1;
@@ -42,15 +41,17 @@ function App() {
 
   return (
     <div className="app">
-      {/* Hero Header */}
       <header className="hero">
-        <div className="hero-bg"></div>
+        <div className="hero-orbs">
+          <div className="orb orb-1"></div>
+          <div className="orb orb-2"></div>
+          <div className="orb orb-3"></div>
+        </div>
         <div className="hero-content">
-          <h1 className="hero-title">
-            <span className="hero-icon">🧳</span> TripSaathi
-          </h1>
+          <p className="hero-eyebrow">AI-Powered Travel Planning</p>
+          <h1 className="hero-title">TripSaathi</h1>
           <p className="hero-subtitle">
-            AI-Powered Multi-Agent Travel Planner
+            Intelligent multi-agent system that crafts personalized itineraries using RAG and LangGraph
           </p>
           <div className="hero-badges">
             <span className="hero-badge">LangChain</span>
@@ -62,12 +63,10 @@ function App() {
       </header>
 
       <main className="main-content">
-        {/* Trip Form */}
         <section className="section form-section">
           <TripForm onSubmit={handleSubmit} isLoading={isLoading} />
         </section>
 
-        {/* Agent Progress */}
         {(isLoading || tripResult) && (
           <section className="section">
             <AgentProgress
@@ -78,12 +77,14 @@ function App() {
           </section>
         )}
 
-        {/* Error */}
         {error && (
           <section className="section">
             <div className="error-card" id="error-card">
-              <h3>❌ Error</h3>
-              <p>{error}</p>
+              <div className="error-icon">!</div>
+              <div>
+                <h3>Request Failed</h3>
+                <p>{error}</p>
+              </div>
               <button onClick={() => setError(null)} className="error-dismiss">
                 Dismiss
               </button>
@@ -91,7 +92,6 @@ function App() {
           </section>
         )}
 
-        {/* Results */}
         {tripResult && (
           <>
             <section className="section">
@@ -116,9 +116,7 @@ function App() {
       </main>
 
       <footer className="footer">
-        <p>
-          Built with LangChain · LangGraph · RAG · FastAPI · React
-        </p>
+        <p>Built with LangChain, LangGraph, RAG, FastAPI & React</p>
       </footer>
     </div>
   );

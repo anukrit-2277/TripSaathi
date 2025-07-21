@@ -1,8 +1,8 @@
 const AGENT_STEPS = [
-  { id: 'destination', label: 'Destination Agent', description: 'Retrieving destination info from RAG...', icon: '🔍' },
-  { id: 'budget', label: 'Budget Agent', description: 'Estimating costs and budget...', icon: '💰' },
-  { id: 'itinerary', label: 'Itinerary Agent', description: 'Creating day-by-day plan...', icon: '📝' },
-  { id: 'critic', label: 'Critic Agent', description: 'Reviewing itinerary quality...', icon: '🔍' },
+  { id: 'destination', label: 'Destination Agent', description: 'Retrieving destination info from knowledge base...' },
+  { id: 'budget', label: 'Budget Agent', description: 'Estimating costs and budget allocation...' },
+  { id: 'itinerary', label: 'Itinerary Agent', description: 'Creating day-by-day travel plan...' },
+  { id: 'critic', label: 'Critic Agent', description: 'Reviewing itinerary quality...' },
 ];
 
 export default function AgentProgress({ currentStep, isComplete, revisionCount }) {
@@ -14,9 +14,9 @@ export default function AgentProgress({ currentStep, isComplete, revisionCount }
   };
 
   return (
-    <div className="agent-progress" id="agent-progress">
-      <h3 className="progress-title">
-        {isComplete ? '✅ Planning Complete' : '🤖 Agents Working...'}
+    <div className="agent-progress glass-card" id="agent-progress">
+      <h3 className="section-title">
+        {isComplete ? 'Planning Complete' : 'Agents Working'}
       </h3>
 
       <div className="progress-steps">
@@ -25,12 +25,16 @@ export default function AgentProgress({ currentStep, isComplete, revisionCount }
           return (
             <div key={step.id} className={`progress-step ${status}`} id={`step-${step.id}`}>
               <div className="step-indicator">
-                {status === 'done' && <span className="step-icon done">✓</span>}
-                {status === 'active' && <span className="step-icon active spinner-icon">↻</span>}
-                {status === 'pending' && <span className="step-icon pending">○</span>}
+                {status === 'done' && (
+                  <svg className="step-icon-svg done" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+                {status === 'active' && <span className="step-spinner"></span>}
+                {status === 'pending' && <span className="step-dot"></span>}
               </div>
               <div className="step-content">
-                <span className="step-label">{step.icon} {step.label}</span>
+                <span className="step-label">{step.label}</span>
                 {status === 'active' && (
                   <span className="step-description">{step.description}</span>
                 )}
@@ -42,10 +46,12 @@ export default function AgentProgress({ currentStep, isComplete, revisionCount }
         {revisionCount > 0 && (
           <div className="progress-step done" id="step-revision">
             <div className="step-indicator">
-              <span className="step-icon done">✓</span>
+              <svg className="step-icon-svg done" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
             </div>
             <div className="step-content">
-              <span className="step-label">🔄 Revision {revisionCount}</span>
+              <span className="step-label">Revision {revisionCount}</span>
               <span className="step-description">Itinerary improved based on feedback</span>
             </div>
           </div>
