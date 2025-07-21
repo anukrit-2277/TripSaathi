@@ -71,6 +71,7 @@ langchain-huggingface>=0.2.0
 #   - Faster for large datasets but no built-in persistence
 #   - No metadata filtering
 chromadb>=1.0.0
+pysqlite3-binary>=0.5.0           # Needed on Linux (Railway/Render) where system SQLite is too old
 
 # --- Database ---
 # SQLAlchemy: Python ORM for database operations.

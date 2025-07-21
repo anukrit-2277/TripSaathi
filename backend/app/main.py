@@ -39,6 +39,15 @@ LIFESPAN EVENTS:
 Using the modern `lifespan` context manager pattern instead of deprecated
 @app.on_event("startup") / @app.on_event("shutdown").
 """
+# --- SQLite fix for Linux deployment (Railway/Render) ---
+# ChromaDB requires SQLite >= 3.35. Railway's Linux has an older version.
+# This swaps in pysqlite3-binary BEFORE chromadb gets imported.
+try:
+    __import__('pysqlite3')
+    import sys
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+except ImportError:
+    pass  # On macOS/local, pysqlite3 isn't needed
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
