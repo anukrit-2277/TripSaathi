@@ -49,7 +49,9 @@ class Settings(BaseSettings):
         description="Groq API key for LLM access"
     )
     llm_model_name: str = Field(
-        default="llama-3.1-70b-versatile",
+        # llama-3.1-70b-versatile was decommissioned by Groq in early 2025.
+        # llama-3.3-70b-versatile is the drop-in replacement.
+        default="llama-3.3-70b-versatile",
         description="Groq model to use for LLM calls"
     )
     llm_temperature: float = Field(
@@ -59,10 +61,20 @@ class Settings(BaseSettings):
         description="LLM temperature (0=deterministic, 2=creative)"
     )
     llm_max_tokens: int = Field(
-        default=4096,
+        # 4096 was overkill for structured outputs and made every LLM call
+        # 2-3x slower than needed. 2048 is more than enough for our schemas
+        # (Itinerary ~1500 tokens worst case) and cuts response time roughly
+        # in half, which is critical to fit inside Railway's edge timeout.
+        default=2048,
         ge=100,
         le=32768,
         description="Maximum tokens in LLM response"
+    )
+    llm_timeout_seconds: float = Field(
+        default=45.0,
+        ge=5.0,
+        le=300.0,
+        description="Per-request timeout for a single LLM call"
     )
 
     # --- Database ---

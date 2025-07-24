@@ -49,6 +49,8 @@ try:
 except ImportError:
     pass  # On macOS/local, pysqlite3 isn't needed
 
+import asyncio
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -79,13 +81,20 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Database init skipped: {e}")
 
-    # Initialize RAG in background thread (embedding download can be slow)
-    import threading
-    def _init_rag():
+    # Warm the RAG pipeline (embeddings + Chroma) synchronously on the
+    # startup thread. Previously we spawned a background thread, which meant
+    # the first inbound /api/trip/plan could race the initializer and pay
+    # the 30-60s embedding-download cost inside the request — long enough
+    # to blow past Railway's edge timeout and surface as "Failed to fetch"
+    # in the browser. Doing it here delays boot slightly, but Railway waits
+    # for /health to respond before routing traffic anyway, so the first
+    # real request always sees a hot vector store.
+    try:
         from app.rag.pipeline import build_vector_store
-        build_vector_store()
+        await asyncio.to_thread(build_vector_store)
         logger.info("RAG pipeline initialized")
-    threading.Thread(target=_init_rag, daemon=True).start()
+    except Exception as e:
+        logger.error(f"RAG pipeline init failed: {e}", exc_info=True)
 
     yield  # App is running — /health responds immediately
 
@@ -110,16 +119,35 @@ app = FastAPI(
 
 
 # --- CORS Middleware ---
-# In development, React runs on localhost:5173 (Vite's default port)
-# and FastAPI runs on localhost:8000. Without CORS, the browser blocks
-# the React app from making API calls to FastAPI.
+# In development, React runs on localhost:5173 (Vite's default port) and
+# FastAPI runs on localhost:8000. In production the frontend is served from
+# trip-saathi.anukritprojects.in.
+#
+# Keeping "*" (or a wildcard fallback) is fine as long as we don't use
+# credentials, but explicitly listing origins makes misconfiguration easier
+# to spot in logs. Override via the CORS_ORIGINS env var if you add a new
+# frontend host — comma separated, e.g. "https://a.com,https://b.com".
+_default_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://trip-saathi.anukritprojects.in",
+]
+_env_origins = os.environ.get("CORS_ORIGINS", "").strip()
+_allowed_origins = (
+    [o.strip() for o in _env_origins.split(",") if o.strip()]
+    if _env_origins
+    else _default_origins
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],           # Allow all origins in development
-    allow_credentials=False,       # No cookies/credentials needed for our API
-    allow_methods=["*"],           # Allow all HTTP methods (GET, POST, OPTIONS, etc.)
-    allow_headers=["*"],           # Allow all headers
+    allow_origins=_allowed_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",  # allow preview deploys
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+logger.info(f"CORS allowed origins: {_allowed_origins}")
 
 
 # --- Health Check Endpoint ---

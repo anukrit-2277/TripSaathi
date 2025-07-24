@@ -118,9 +118,14 @@ def get_llm(
         model=_model,
         temperature=_temperature,
         max_tokens=_max_tokens,
-        # max_retries: LangChain will automatically retry on transient errors
-        # (rate limits, network timeouts). This is crucial for production.
-        max_retries=3,
+        # Per-call timeout so a hung/rate-limited request cannot block the
+        # workflow for minutes. Combined with the outer workflow timeout,
+        # this bounds total latency predictably.
+        timeout=settings.llm_timeout_seconds,
+        # 3 retries × exponential backoff can add 60s+ to a single call.
+        # Drop to 1 retry so transient rate limits still recover, but we
+        # fail fast instead of hanging the browser fetch.
+        max_retries=1,
     )
 
     return llm

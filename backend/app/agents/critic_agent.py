@@ -61,8 +61,12 @@ from app.graph.state import TravelState
 
 logger = get_logger(__name__)
 
-# Maximum revision attempts before accepting the itinerary as-is
-MAX_REVISIONS = 3
+# Maximum revision attempts before accepting the itinerary as-is.
+# We keep this low (1) because each revision fires two more LLM calls
+# (itinerary + critic) and easily pushes total request time past the
+# Railway edge / browser fetch timeout. If the first draft fails critique
+# we still return it — better a slightly-imperfect trip than a failed request.
+MAX_REVISIONS = 1
 
 
 # ============================================================

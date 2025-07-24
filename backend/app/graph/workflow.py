@@ -84,6 +84,8 @@ INTERVIEW QUESTIONS:
      (e.g., "Does the user approve this itinerary before finalizing?").
 """
 
+import asyncio
+
 from langgraph.graph import StateGraph, END
 
 from app.graph.state import TravelState
@@ -122,7 +124,9 @@ def should_revise_or_finish(state: TravelState) -> str:
         logger.info(f"🏁 Workflow routing → END (status: {status})")
         return "end"
 
-    if revision_count >= 3:
+    # Keep this guard in sync with critic_agent.MAX_REVISIONS.
+    from app.agents.critic_agent import MAX_REVISIONS
+    if revision_count >= MAX_REVISIONS:
         logger.warning(
             f"🏁 Workflow routing → END (max revisions reached: {revision_count})"
         )
@@ -247,9 +251,30 @@ async def run_travel_workflow(
     }
 
     # Run the workflow
-    # .invoke() runs the graph synchronously (each node in order)
-    # The graph handles conditional routing automatically
-    result = travel_workflow.invoke(initial_state)
+    # Agent nodes are synchronous (LLM/RAG use blocking clients), so calling
+    # .invoke() directly here would block FastAPI's event loop and every other
+    # request queued behind it until the whole graph finished (which can take
+    # 60-120 seconds). asyncio.to_thread offloads the blocking work to a
+    # worker thread so uvicorn can keep serving /health, CORS preflights, and
+    # concurrent requests while this workflow runs.
+    #
+    # We also enforce a hard timeout so the request cannot outlast Railway's
+    # ~5 minute edge timeout — if the graph is still running after 240s we
+    # abort cleanly and let the API layer surface a real error, instead of the
+    # browser seeing "Failed to fetch" from a killed TCP connection.
+    try:
+        result = await asyncio.wait_for(
+            asyncio.to_thread(travel_workflow.invoke, initial_state),
+            timeout=240.0,
+        )
+    except asyncio.TimeoutError as e:
+        logger.error("⏱️ Workflow timed out after 240s")
+        # Re-raise as the builtin TimeoutError so the API layer can catch it
+        # and return 504 instead of a generic 500.
+        raise TimeoutError(
+            "Trip planning exceeded 240s. This usually means the LLM provider "
+            "is rate-limited or slow. Please try again in a minute."
+        ) from e
 
     logger.info(
         f"🏁 Workflow complete. Status: {result.get('status')}, "

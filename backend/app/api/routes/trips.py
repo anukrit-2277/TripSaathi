@@ -156,6 +156,19 @@ async def plan_trip(request: TripRequest) -> TripResponse:
 
     except HTTPException:
         raise
+    except TimeoutError as e:
+        # asyncio.TimeoutError is a subclass of TimeoutError. Surface as 504
+        # so the frontend can show a friendly retry message instead of the
+        # generic "Failed to fetch" it gets when the TCP connection is cut
+        # by Railway's edge proxy.
+        logger.error(f"⏱️ Trip planning timed out: {e}")
+        raise HTTPException(
+            status_code=504,
+            detail=(
+                "Trip planning is taking longer than usual. The LLM provider "
+                "may be slow or rate-limited. Please try again in a minute."
+            ),
+        )
     except Exception as e:
         logger.error(f"❌ Trip planning failed: {e}", exc_info=True)
         raise HTTPException(
