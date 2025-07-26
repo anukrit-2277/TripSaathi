@@ -250,30 +250,33 @@ async def run_travel_workflow(
         "error": "",
     }
 
-    # Run the workflow
-    # Agent nodes are synchronous (LLM/RAG use blocking clients), so calling
-    # .invoke() directly here would block FastAPI's event loop and every other
-    # request queued behind it until the whole graph finished (which can take
-    # 60-120 seconds). asyncio.to_thread offloads the blocking work to a
-    # worker thread so uvicorn can keep serving /health, CORS preflights, and
-    # concurrent requests while this workflow runs.
+    # Run the workflow via LangGraph's native async runner.
     #
-    # We also enforce a hard timeout so the request cannot outlast Railway's
-    # ~5 minute edge timeout — if the graph is still running after 240s we
-    # abort cleanly and let the API layer surface a real error, instead of the
-    # browser seeing "Failed to fetch" from a killed TCP connection.
+    # We use .ainvoke() (not asyncio.to_thread(.invoke)) because:
+    #  - .ainvoke() cooperates with asyncio cancellation, so wait_for CAN
+    #    actually interrupt an in-flight LLM call. asyncio.to_thread cannot
+    #    kill a thread; a wedged sync Groq call would keep the thread alive
+    #    forever and eventually exhaust the executor pool.
+    #  - LangGraph awaits async nodes natively (see the *_agent_node_async
+    #    functions), so LLM I/O is non-blocking and multiple requests share
+    #    a single event loop cleanly.
+    #
+    # We keep a hard 180s wall clock (down from 240s) — with MAX_REVISIONS=1
+    # and gpt-oss-20b, the worst realistic case is ~90s, so 180s gives us a
+    # comfortable buffer while staying well inside Railway's ~5 min edge
+    # timeout. On timeout we raise TimeoutError; the API layer maps that to
+    # a friendly 504 with CORS headers instead of the browser seeing a bare
+    # "Failed to fetch" from a killed socket.
     try:
         result = await asyncio.wait_for(
-            asyncio.to_thread(travel_workflow.invoke, initial_state),
-            timeout=240.0,
+            travel_workflow.ainvoke(initial_state),
+            timeout=180.0,
         )
     except asyncio.TimeoutError as e:
-        logger.error("⏱️ Workflow timed out after 240s")
-        # Re-raise as the builtin TimeoutError so the API layer can catch it
-        # and return 504 instead of a generic 500.
+        logger.error("⏱️ Workflow timed out after 180s")
         raise TimeoutError(
-            "Trip planning exceeded 240s. This usually means the LLM provider "
-            "is rate-limited or slow. Please try again in a minute."
+            "Trip planning exceeded 180s. The LLM provider is likely "
+            "rate-limited or slow — please try again in a minute."
         ) from e
 
     logger.info(

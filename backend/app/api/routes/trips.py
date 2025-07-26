@@ -85,11 +85,27 @@ async def plan_trip(request: TripRequest) -> TripResponse:
             preferences=request.preferences,
         )
 
-        # Check for workflow errors
-        if result.get("error") and not result.get("itinerary", {}).get("days"):
+        # Only 500 if the itinerary itself is empty. A critic-only failure
+        # is non-fatal: we still return the itinerary we produced, plus a
+        # degraded critique. This avoids showing users a scary 500 when
+        # the trip plan actually generated successfully but the critique
+        # step hit a Groq schema-validation edge case.
+        itinerary_days = result.get("itinerary", {}).get("days") or []
+        if not itinerary_days:
+            error_detail = result.get("error") or "Unknown error"
+            logger.error(f"❌ Workflow returned no itinerary days: {error_detail}")
             raise HTTPException(
-                status_code=500,
-                detail=f"Workflow failed: {result['error']}",
+                status_code=502,
+                detail=(
+                    "The LLM provider could not generate a valid itinerary. "
+                    "This is usually a temporary rate-limit or model issue — "
+                    "please try again in a minute."
+                ),
+            )
+        if result.get("error"):
+            logger.warning(
+                f"⚠️ Workflow completed with soft error (returning itinerary anyway): "
+                f"{result['error']}"
             )
 
         # Generate trip ID

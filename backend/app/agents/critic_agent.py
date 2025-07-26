@@ -55,7 +55,7 @@ import json
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-from app.core.llm import get_llm
+from app.core.llm import get_llm, structured_invoke
 from app.core.logger import get_logger
 from app.graph.state import TravelState
 
@@ -218,7 +218,7 @@ def _validate_schedule(state: TravelState) -> list[Issue]:
 # Agent Node Function
 # ============================================================
 
-def critic_agent_node(state: TravelState) -> dict:
+async def critic_agent_node(state: TravelState) -> dict:
     """
     LangGraph node function for the Critic Agent.
     
@@ -246,28 +246,30 @@ def critic_agent_node(state: TravelState) -> dict:
         logger.info(f"   Deterministic checks found {len(deterministic_issues)} issue(s)")
 
         # === QUALITATIVE VALIDATION (LLM) ===
-        llm = get_llm(temperature=0.2)  # Low temperature for consistent evaluation
-        structured_llm = llm.with_structured_output(CritiqueLLM)
-
         preferences_text = ", ".join(state.get("preferences", []))
         itinerary_text = json.dumps(state.get("itinerary", {}), indent=2)
         budget_text = json.dumps(state.get("budget_breakdown", {}), indent=2)
         context_text = "\n".join(state.get("retrieved_context", [])[:3])
 
-        chain = CRITIQUE_PROMPT | structured_llm
-
-        llm_critique: CritiqueLLM = chain.invoke({
-            "destination": state["destination"],
-            "days": state["days"],
-            "travelers": state["travelers"],
-            "budget": state["budget"],
-            "preferences": preferences_text,
-            "itinerary": itinerary_text,
-            "budget_breakdown": budget_text,
-            "context": context_text,
-            "revision_count": revision_count,
-            "max_revisions": MAX_REVISIONS,
-        })
+        # structured_invoke() does tool-calling first; if the model returns
+        # partial args (common on gpt-oss-20b) it retries with json_mode.
+        llm_critique: CritiqueLLM = await structured_invoke(
+            CRITIQUE_PROMPT,
+            CritiqueLLM,
+            {
+                "destination": state["destination"],
+                "days": state["days"],
+                "travelers": state["travelers"],
+                "budget": state["budget"],
+                "preferences": preferences_text,
+                "itinerary": itinerary_text,
+                "budget_breakdown": budget_text,
+                "context": context_text,
+                "revision_count": revision_count,
+                "max_revisions": MAX_REVISIONS,
+            },
+            temperature=0.2,
+        )
 
         # Combine LLM issues with deterministic issues
         all_issues = [issue.model_dump() for issue in deterministic_issues]

@@ -61,11 +61,14 @@ class Settings(BaseSettings):
         description="LLM temperature (0=deterministic, 2=creative)"
     )
     llm_max_tokens: int = Field(
-        # 4096 was overkill for structured outputs and made every LLM call
-        # 2-3x slower than needed. 2048 is more than enough for our schemas
-        # (Itinerary ~1500 tokens worst case) and cuts response time roughly
-        # in half, which is critical to fit inside Railway's edge timeout.
-        default=2048,
+        # Groq counts ``max_tokens`` against the tokens-per-minute (TPM)
+        # budget even if the model doesn't emit that many. On the free tier
+        # gpt-oss-20b has an 8000 TPM cap; asking for 4096 output tokens on
+        # every one of the 3-5 workflow LLM calls guarantees mid-workflow
+        # 429s. 1536 comfortably fits every structured output we produce
+        # (Itinerary is ~1200 tokens worst case) and keeps us well under
+        # the free-tier ceiling.
+        default=1536,
         ge=100,
         le=32768,
         description="Maximum tokens in LLM response"

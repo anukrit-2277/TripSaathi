@@ -47,7 +47,7 @@ import json
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-from app.core.llm import get_llm
+from app.core.llm import structured_invoke
 from app.core.logger import get_logger
 from app.graph.state import TravelState
 
@@ -144,7 +144,7 @@ Create a realistic, enjoyable itinerary that matches the preferences and budget.
 # Agent Node Function
 # ============================================================
 
-def itinerary_agent_node(state: TravelState) -> dict:
+async def itinerary_agent_node(state: TravelState) -> dict:
     """
     LangGraph node function for the Itinerary Agent.
     
@@ -198,23 +198,25 @@ Do NOT just regenerate randomly — make targeted fixes based on the feedback.""
         context_text = "\n".join(state.get("retrieved_context", [])[:5])  # Top 5 chunks
         preferences_text = ", ".join(state.get("preferences", []))
 
-        # Use slightly higher temperature for creative itinerary generation
-        llm = get_llm(temperature=0.4)
-        structured_llm = llm.with_structured_output(Itinerary)
-
-        chain = ITINERARY_PROMPT | structured_llm
-
-        result: Itinerary = chain.invoke({
-            "destination": state["destination"],
-            "days": state["days"],
-            "travelers": state["travelers"],
-            "budget": state["budget"],
-            "preferences": preferences_text,
-            "attractions": attractions_text,
-            "budget_breakdown": budget_text,
-            "context": context_text,
-            "revision_instructions": revision_instructions,
-        })
+        # structured_invoke() handles tool_use_failed by retrying in
+        # json_mode — important for smaller Groq models (gpt-oss-20b) that
+        # sometimes return partial tool arguments.
+        result: Itinerary = await structured_invoke(
+            ITINERARY_PROMPT,
+            Itinerary,
+            {
+                "destination": state["destination"],
+                "days": state["days"],
+                "travelers": state["travelers"],
+                "budget": state["budget"],
+                "preferences": preferences_text,
+                "attractions": attractions_text,
+                "budget_breakdown": budget_text,
+                "context": context_text,
+                "revision_instructions": revision_instructions,
+            },
+            temperature=0.4,
+        )
 
         itinerary_dict = result.model_dump()
 

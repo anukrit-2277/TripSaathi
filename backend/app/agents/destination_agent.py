@@ -39,7 +39,7 @@ import json
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-from app.core.llm import get_llm
+from app.core.llm import structured_invoke
 from app.core.logger import get_logger
 from app.graph.state import TravelState
 from app.rag.retriever import multi_query_retrieve
@@ -123,7 +123,7 @@ Make sure to include at least 5 relevant attractions with accurate details from 
 # Agent Node Function
 # ============================================================
 
-def destination_agent_node(state: TravelState) -> dict:
+async def destination_agent_node(state: TravelState) -> dict:
     """
     LangGraph node function for the Destination Agent.
     
@@ -186,24 +186,22 @@ def destination_agent_node(state: TravelState) -> dict:
             }
 
         # Step 3: Use LLM to extract structured information from raw text
-        # .with_structured_output(DestinationInfo) forces the LLM to return
-        # JSON matching our Pydantic model. This is CRITICAL — without it,
-        # the LLM might return prose that downstream agents can't parse.
-        llm = get_llm(temperature=0.2)  # Low temperature for factual extraction
-        structured_llm = llm.with_structured_output(DestinationInfo)
-
-        # Build the prompt with retrieved context
+        # structured_invoke() forces JSON output and falls back to json_mode
+        # if the model returns partial tool arguments (common on 20B models).
         context_text = "\n\n---\n\n".join(retrieved_context)
         preferences_text = ", ".join(preferences)
 
-        chain = DESTINATION_PROMPT | structured_llm
-
-        result: DestinationInfo = chain.invoke({
-            "destination": destination,
-            "preferences": preferences_text,
-            "days": state["days"],
-            "context": context_text,
-        })
+        result: DestinationInfo = await structured_invoke(
+            DESTINATION_PROMPT,
+            DestinationInfo,
+            {
+                "destination": destination,
+                "preferences": preferences_text,
+                "days": state["days"],
+                "context": context_text,
+            },
+            temperature=0.2,
+        )
 
         # Convert Pydantic models to dicts for state storage
         attractions_list = [attr.model_dump() for attr in result.attractions]

@@ -35,7 +35,7 @@ import json
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-from app.core.llm import get_llm
+from app.core.llm import structured_invoke
 from app.core.logger import get_logger
 from app.graph.state import TravelState
 
@@ -98,7 +98,7 @@ Based on this budget level and the context, extract the average prices."""
 # Agent Node Function
 # ============================================================
 
-def budget_agent_node(state: TravelState) -> dict:
+async def budget_agent_node(state: TravelState) -> dict:
     """
     LangGraph node function for the Budget Agent.
     
@@ -140,21 +140,24 @@ def budget_agent_node(state: TravelState) -> dict:
         # Calculate per-person-per-day budget for context
         per_person_per_day = budget / (travelers * days)
 
-        # Step 1: Use LLM to extract price data from context
-        llm = get_llm(temperature=0.1)  # Very low temperature for precise extraction
-        structured_llm = llm.with_structured_output(ExtractedPrices)
-
-        context_text = "\n\n".join(context[:10])  # Limit context to avoid token limits
-
-        chain = PRICE_EXTRACTION_PROMPT | structured_llm
-        prices: ExtractedPrices = chain.invoke({
-            "destination": destination,
-            "budget": budget,
-            "travelers": travelers,
-            "days": days,
-            "per_person_per_day": round(per_person_per_day),
-            "context": context_text,
-        })
+        # Step 1: Use LLM to extract price data from context.
+        # structured_invoke() falls back to json_mode when a smaller model
+        # returns partial tool arguments, keeping this robust across
+        # openai/gpt-oss-20b and llama-3.3-70b-versatile.
+        context_text = "\n\n".join(context[:10])
+        prices: ExtractedPrices = await structured_invoke(
+            PRICE_EXTRACTION_PROMPT,
+            ExtractedPrices,
+            {
+                "destination": destination,
+                "budget": budget,
+                "travelers": travelers,
+                "days": days,
+                "per_person_per_day": round(per_person_per_day),
+                "context": context_text,
+            },
+            temperature=0.1,
+        )
 
         logger.info(f"   Extracted prices — category: {prices.budget_category}")
 

@@ -64,11 +64,20 @@ INTERVIEW QUESTIONS:
      response reliably. Without it, you'd need fragile string parsing.
 """
 
+from typing import Type, TypeVar
+
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import Runnable
 from langchain_groq import ChatGroq
+from pydantic import BaseModel
+
 from app.config import settings
 from app.core.logger import get_logger
 
 logger = get_logger(__name__)
+
+T = TypeVar("T", bound=BaseModel)
 
 
 def get_llm(
@@ -129,3 +138,75 @@ def get_llm(
     )
 
     return llm
+
+
+async def structured_invoke(
+    prompt: ChatPromptTemplate,
+    schema: Type[T],
+    inputs: dict,
+    *,
+    temperature: float | None = None,
+    max_tokens: int | None = None,
+) -> T:
+    """
+    Run a structured-output LLM call with a robust fallback path.
+
+    Small Groq models (notably openai/gpt-oss-20b) frequently return partial
+    tool arguments — e.g. only one field of a Pydantic schema — which Groq
+    then rejects with HTTP 400 ``tool_use_failed``. That surfaces as a
+    ``BadRequestError`` from the client library and kills the whole agent
+    even though the model was clearly *willing* to answer.
+
+    This helper wraps the call so that, if tool-calling fails validation,
+    we retry the exact same schema using Groq's ``json_mode`` — which is
+    less strict about tool metadata and much more forgiving on 20B models.
+    JSON is then parsed back into the Pydantic model manually.
+
+    If BOTH paths fail, the caller's exception handler still gets a real
+    exception and can degrade gracefully.
+    """
+    llm = get_llm(temperature=temperature, max_tokens=max_tokens)
+
+    # Primary path: tool calling — highest fidelity when it works.
+    try:
+        chain: Runnable = prompt | llm.with_structured_output(schema)
+        return await chain.ainvoke(inputs)
+    except Exception as first_err:
+        msg = str(first_err).lower()
+        # Only fall back for the specific failure modes JSON mode can fix:
+        # tool-call schema violations and generic invalid-request errors.
+        # Rate limits, timeouts, auth errors: re-raise so the caller sees
+        # the real cause.
+        if not any(k in msg for k in ("tool_use_failed", "tool call validation", "did not match schema")):
+            raise
+        logger.warning(
+            f"⚠️ Tool-calling structured output failed ({first_err}); "
+            f"retrying with json_mode."
+        )
+
+    # Fallback path: JSON mode. We embed the schema into the prompt so the
+    # model knows what to produce. Then parse the raw string back into the
+    # Pydantic model. This is slightly more forgiving than tool-calling and
+    # works reliably on smaller Groq models.
+    import json
+
+    schema_hint = json.dumps(schema.model_json_schema(), indent=2)
+    fallback_prompt = ChatPromptTemplate.from_messages(
+        prompt.messages
+        + [
+            (
+                "system",
+                (
+                    "Return ONLY a single JSON object that conforms to this JSON "
+                    "schema. Do not include any prose or markdown fences.\n\n"
+                    f"SCHEMA:\n{schema_hint}"
+                ),
+            )
+        ]
+    )
+    json_llm = get_llm(temperature=temperature, max_tokens=max_tokens).bind(
+        response_format={"type": "json_object"}
+    )
+    raw = await (fallback_prompt | json_llm).ainvoke(inputs)
+    text = raw.content if hasattr(raw, "content") else str(raw)
+    return schema.model_validate_json(text)
