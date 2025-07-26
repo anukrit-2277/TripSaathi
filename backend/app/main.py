@@ -163,11 +163,25 @@ async def health_check():
     """
     Simple health check endpoint.
     Returns 200 OK if the server is running.
+
+    Also surfaces the currently-loaded LLM config so you can verify the
+    running container actually picked up your Railway env vars (an
+    unredeployed service will show the old model even if Variables looks
+    right in the dashboard). No secrets are exposed — only the model name,
+    max_tokens, and whether an API key is present.
     """
+    from app.config import settings
     return {
         "status": "healthy",
         "service": "TripSaathi",
         "version": "1.0.0",
+        "llm": {
+            "model": settings.llm_model_name,
+            "max_tokens": settings.llm_max_tokens,
+            "temperature": settings.llm_temperature,
+            "timeout_seconds": settings.llm_timeout_seconds,
+            "api_key_present": bool(settings.groq_api_key),
+        },
     }
 
 
