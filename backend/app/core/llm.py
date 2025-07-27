@@ -80,6 +80,19 @@ logger = get_logger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 
+def _finish_reason(message) -> str | None:
+    """
+    Extract the provider's finish_reason from a LangChain AIMessage.
+
+    "length" means the model hit the max_tokens ceiling and its output is
+    truncated — which, for structured output, means the JSON is unparseable
+    through no fault of the prompt. Worth surfacing loudly, since it is
+    otherwise invisible without inspecting response_metadata by hand.
+    """
+    meta = getattr(message, "response_metadata", None) or {}
+    return meta.get("finish_reason")
+
+
 def get_llm(
     temperature: float | None = None,
     max_tokens: int | None = None,
@@ -179,6 +192,17 @@ async def structured_invoke(
         # the real cause.
         if not any(k in msg for k in ("tool_use_failed", "tool call validation", "did not match schema")):
             raise
+        # A truncated tool call and a malformed one both surface as
+        # tool_use_failed, but only the first is fixed by more tokens.
+        # Groq echoes the partial output in `failed_generation`, so an
+        # unterminated JSON blob there is the truncation signature.
+        if "failed to parse tool call arguments" in msg:
+            logger.error(
+                f"🚨 {schema.__name__} tool call was cut off mid-JSON — this is "
+                f"almost always max_tokens being too low for a reasoning model "
+                f"(reasoning tokens count against the same budget). "
+                f"Consider raising LLM_MAX_TOKENS."
+            )
         logger.warning(
             f"⚠️ Tool-calling structured output failed ({first_err}); "
             f"retrying with json_mode."
@@ -190,7 +214,16 @@ async def structured_invoke(
     # works reliably on smaller Groq models.
     import json
 
+    # ChatPromptTemplate parses message strings as f-string templates, so
+    # every literal { and } in the JSON schema would be read as a template
+    # variable and blow up with "Invalid format specifier" BEFORE any LLM
+    # call happens. Doubling the braces escapes them.
+    #
+    # This was a real bug: the fallback below never once executed, because
+    # building the template raised on every single invocation. Any change
+    # here must keep the escaping.
     schema_hint = json.dumps(schema.model_json_schema(), indent=2)
+    escaped_schema_hint = schema_hint.replace("{", "{{").replace("}", "}}")
     fallback_prompt = ChatPromptTemplate.from_messages(
         prompt.messages
         + [
@@ -199,7 +232,7 @@ async def structured_invoke(
                 (
                     "Return ONLY a single JSON object that conforms to this JSON "
                     "schema. Do not include any prose or markdown fences.\n\n"
-                    f"SCHEMA:\n{schema_hint}"
+                    f"SCHEMA:\n{escaped_schema_hint}"
                 ),
             )
         ]
@@ -208,5 +241,24 @@ async def structured_invoke(
         response_format={"type": "json_object"}
     )
     raw = await (fallback_prompt | json_llm).ainvoke(inputs)
+
+    if _finish_reason(raw) == "length":
+        logger.error(
+            f"🚨 {schema.__name__} json_mode output hit the max_tokens ceiling "
+            f"(finish_reason=length). The JSON is truncated and will not parse. "
+            f"Raise LLM_MAX_TOKENS."
+        )
+
     text = raw.content if hasattr(raw, "content") else str(raw)
-    return schema.model_validate_json(text)
+    try:
+        return schema.model_validate_json(text)
+    except Exception as parse_err:
+        # Distinguish "model was cut off" from "model wrote bad JSON" — these
+        # need completely different fixes and used to look identical in logs.
+        if _finish_reason(raw) == "length":
+            raise ValueError(
+                f"{schema.__name__} output was truncated by the token limit "
+                f"(finish_reason=length). Raise LLM_MAX_TOKENS — the current "
+                f"budget cannot fit this response."
+            ) from parse_err
+        raise

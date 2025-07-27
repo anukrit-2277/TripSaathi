@@ -61,14 +61,25 @@ class Settings(BaseSettings):
         description="LLM temperature (0=deterministic, 2=creative)"
     )
     llm_max_tokens: int = Field(
-        # Groq counts ``max_tokens`` against the tokens-per-minute (TPM)
-        # budget even if the model doesn't emit that many. On the free tier
-        # gpt-oss-20b has an 8000 TPM cap; asking for 4096 output tokens on
-        # every one of the 3-5 workflow LLM calls guarantees mid-workflow
-        # 429s. 1536 comfortably fits every structured output we produce
-        # (Itinerary is ~1200 tokens worst case) and keeps us well under
-        # the free-tier ceiling.
-        default=1536,
+        # NOTE: this budget must cover REASONING tokens, not just visible
+        # output. The gpt-oss family are reasoning models — a single
+        # itinerary call was measured spending ~550 tokens on reasoning
+        # before emitting its first output token.
+        #
+        # The old value of 1536 was tuned for gpt-oss-20b's 8000 TPM free
+        # tier, but it left only ~1000 usable tokens. A 3-day itinerary
+        # (3 days x 3-5 activities + 3 meals + notes) does not fit, so the
+        # response was cut off mid-JSON (finish_reason="length") and Groq
+        # rejected the truncated tool call with 400 tool_use_failed.
+        #
+        # Measured on openai/gpt-oss-120b with a 3-day Jaipur itinerary:
+        #   1536 -> fails    4096 -> works    8192 -> works
+        # 6144 is 4096 plus headroom for longer (5-7 day) trips.
+        #
+        # TRADEOFF: Groq counts max_tokens against the TPM budget, so on a
+        # free-tier key a workflow that burns revisions may see 429s. If
+        # that happens, lower this rather than going back under ~4096.
+        default=6144,
         ge=100,
         le=32768,
         description="Maximum tokens in LLM response"
