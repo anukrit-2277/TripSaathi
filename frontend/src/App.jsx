@@ -6,7 +6,6 @@ import AgentProgress from './components/AgentProgress';
 import ItineraryView from './components/ItineraryView';
 import BudgetBreakdown from './components/BudgetBreakdown';
 import CriticStatus from './components/CriticStatus';
-import SourcesList from './components/SourcesList';
 import { DESTINATIONS } from './data/destinations';
 import { IconPin } from './components/icons';
 import { planTrip } from './api/tripApi';
@@ -168,9 +167,8 @@ function App() {
               </section>
 
               <section className="section--tight">
-                <div className="shell results-split reveal">
+                <div className="shell reveal">
                   <CriticStatus critique={tripResult.critique} />
-                  <SourcesList sources={tripResult.sources} />
                 </div>
               </section>
             </>
@@ -206,13 +204,6 @@ function App() {
       <footer className="footer">
         <div className="shell footer-inner">
           <p>TripSaathi — multi-agent trip planning, grounded in real data.</p>
-          <div className="footer-stack">
-            <span>LangChain</span>
-            <span>LangGraph</span>
-            <span>RAG</span>
-            <span>FastAPI</span>
-            <span>React</span>
-          </div>
         </div>
       </footer>
     </div>

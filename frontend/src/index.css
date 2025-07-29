@@ -337,6 +337,7 @@ h1, h2, h3 { text-wrap: balance; }
   gap: var(--s-3);
   margin-right: auto;
   text-decoration: none;
+  min-height: 44px;
 }
 .brand-mark {
   width: 34px; height: 34px;
@@ -517,57 +518,6 @@ h1, h2, h3 { text-wrap: balance; }
   opacity: 0.85;
 }
 
-/* Floating glass chip over the collage — depth without clutter. */
-.collage-chip {
-  position: absolute;
-  /* Straddles the collage's bottom-left corner. The overhang MUST be
-     equal on both axes — an earlier version hung 32px left but only 24px
-     down, and that 8px difference is exactly what made it read as
-     misaligned rather than as a deliberate float.
-     
-     max-width caps how much of the tile behind it gets covered; at 71%
-     it stopped looking like a corner element and started looking like a
-     panel dropped onto a photo. */
-  --chip-overhang: 28px;
-  left: calc(-1 * var(--chip-overhang));
-  bottom: calc(-1 * var(--chip-overhang));
-  max-width: min(255px, 62%);
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
-  /* 12px on three sides, 16px on the right. Deliberate optical
-     compensation, not an oversight: the left content is a circle whose
-     curvature already echoes the pill's, so it needs less breathing
-     room than a flat run of text does. */
-  padding: var(--s-3);
-  padding-right: var(--s-4);
-  border-radius: var(--r-pill);
-  /* Nearly opaque on purpose. This chip straddles the photo's left edge,
-     so at the original 0.72 the backdrop behind it changed abruptly
-     mid-panel — page cream on the left, river photo on the right — and
-     that tonal seam ran straight through the icon. Frosted glass only
-     looks clean over a *continuous* backdrop; over a hard edge it shows
-     the join. 0.93 keeps the blur/saturate treatment without the seam. */
-  background: rgba(255, 255, 255, 0.93);
-  backdrop-filter: blur(18px) saturate(180%);
-  -webkit-backdrop-filter: blur(18px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  box-shadow: var(--sh-lg);
-}
-.chip-dot {
-  width: 34px; height: 34px;
-  border-radius: 50%;
-  background: var(--ok-bg);
-  color: var(--ok);
-  display: grid; place-items: center;
-  flex: none;
-}
-.chip-dot svg { width: 17px; height: 17px; }
-.chip-text { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
-.chip-text strong { font-size: var(--t-sm); font-weight: 700; color: var(--ink-900); }
-.chip-text span { font-size: var(--t-micro); color: var(--ink-600); text-wrap: pretty; }
-
 .hero-collage-wrap { position: relative; }
 
 
@@ -701,7 +651,7 @@ h1, h2, h3 { text-wrap: balance; }
 /* Destination chooser inside the popover */
 .dest-options {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(158px, 100%), 1fr));
   gap: var(--s-3);
 }
 .dest-option {
@@ -1053,7 +1003,7 @@ h1, h2, h3 { text-wrap: balance; }
 
 .progress-rail {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
   gap: var(--s-4);
 }
 
@@ -1479,7 +1429,7 @@ h1, h2, h3 { text-wrap: balance; }
 /* --- Notes / tips cards below the timeline --- */
 .notes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap: var(--s-5);
   margin-top: var(--s-8);
 }
@@ -1522,13 +1472,6 @@ h1, h2, h3 { text-wrap: balance; }
    12  QUALITY REVIEW + SOURCES
    ============================================================ */
 
-.results-split {
-  display: grid;
-  grid-template-columns: 1.5fr 1fr;
-  gap: clamp(1.25rem, 0.75rem + 1.5vw, 2rem);
-  align-items: start;
-}
-
 .score-row {
   display: flex;
   align-items: center;
@@ -1570,6 +1513,7 @@ h1, h2, h3 { text-wrap: balance; }
   color: var(--ink-600);
   line-height: 1.6;
   margin-top: var(--s-2);
+  max-width: var(--measure);
 }
 
 .sub-head {
@@ -1601,6 +1545,7 @@ h1, h2, h3 { text-wrap: balance; }
   font-size: var(--t-sm);
   color: var(--ink-700);
   line-height: 1.55;
+  max-width: var(--measure);
 }
 .issue + .issue { border-top: 1px solid var(--sand-150); }
 .issue-dot {
@@ -1613,27 +1558,6 @@ h1, h2, h3 { text-wrap: balance; }
 .issue-dot.high { background: var(--bad); }
 .issue-dot.medium { background: var(--warn); }
 .issue-dot.low { background: var(--forest-500); }
-
-.source-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-2);
-  padding: 0.4rem 0.8rem;
-  border-radius: var(--r-sm);
-  background: var(--sand-100);
-  border: 1px solid var(--sand-200);
-  font-size: var(--t-xs);
-  color: var(--ink-600);
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-}
-.source-tag svg { width: 13px; height: 13px; opacity: 0.6; }
-.sources-note {
-  font-size: var(--t-xs);
-  color: var(--ink-400);
-  line-height: 1.6;
-  margin-top: var(--s-4);
-}
-
 
 /* ============================================================
    13  FOOTER, ERRORS, UTILITIES
@@ -1685,15 +1609,6 @@ h1, h2, h3 { text-wrap: balance; }
   flex-wrap: wrap;
 }
 .footer p { font-size: var(--t-xs); color: var(--ink-400); }
-.footer-stack { display: flex; gap: var(--s-4); flex-wrap: wrap; }
-.footer-stack span {
-  font-size: var(--t-micro);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--ink-300);
-  font-weight: 600;
-}
-
 .btn-ghost {
   display: inline-flex;
   align-items: center;
@@ -1714,6 +1629,7 @@ h1, h2, h3 { text-wrap: balance; }
   display: inline-flex;
   align-items: center;
   gap: var(--s-2);
+  min-height: 44px;   /* comfortable touch target; text alone was 23px */
   font-size: var(--t-sm);
   font-weight: 600;
   color: var(--ink-600);
@@ -1749,8 +1665,6 @@ h1, h2, h3 { text-wrap: balance; }
 @media (max-width: 1024px) {
   .hero-grid { grid-template-columns: 1fr; gap: var(--s-8); }
   .hero-collage { aspect-ratio: 1.35 / 1; max-height: 460px; }
-  .collage-chip { --chip-overhang: 0px; left: var(--s-4); bottom: var(--s-4); }
-  .results-split { grid-template-columns: 1fr; }
   .planner-bar { grid-template-columns: 1fr 1fr; }
   .planner-submit { grid-column: 1 / -1; padding-block: var(--s-4); }
   .seg + .seg::before { display: none; }
@@ -1792,8 +1706,15 @@ h1, h2, h3 { text-wrap: balance; }
   .tl-mark { grid-column: 1; grid-row: 1 / span 2; justify-content: flex-start; }
   .tl-body { grid-column: 2; grid-row: 2; }
 
-  .day-toggle { gap: var(--s-4); }
+  /* With a wrapped title and a 3-line meta row, centring pushed the day
+     badge to the middle of a tall block while the title sat at the top.
+     Align to the top edge instead so badge, title and caret share a line. */
+  .day-toggle { gap: var(--s-4); align-items: flex-start; }
   .day-num { width: 46px; height: 46px; }
+  /* The "·" separators dangle at the end of wrapped lines; the gap
+     between items already does the separating on narrow screens. */
+  .day-counts { gap: var(--s-2) var(--s-4); }
+  .day-counts .sep { display: none; }
   .footer-inner { flex-direction: column; align-items: flex-start; }
 }
 

@@ -1,6 +1,6 @@
 import SmartImage from './SmartImage';
 import { HERO_IMAGES } from '../data/destinations';
-import { IconCheck, IconArrow } from './icons';
+import { IconArrow } from './icons';
 
 /**
  * Hero — asymmetric bento collage, not a full-bleed background photo.
@@ -79,13 +79,6 @@ export default function Hero({ onStart }) {
             ))}
           </div>
 
-          <div className="collage-chip">
-            <span className="chip-dot"><IconCheck /></span>
-            <span className="chip-text">
-              <strong>Budget-checked</strong>
-              <span>Costed before you see it</span>
-            </span>
-          </div>
         </div>
       </div>
     </header>
