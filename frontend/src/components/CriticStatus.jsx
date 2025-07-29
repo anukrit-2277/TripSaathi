@@ -1,43 +1,56 @@
+/**
+ * Quality review.
+ *
+ * The score is drawn with a conic-gradient ring — no chart library, no
+ * SVG arc maths, and it animates cleanly because it is one CSS variable.
+ */
 export default function CriticStatus({ critique }) {
-  if (!critique || !critique.status) return null;
+  if (!critique?.status) return null;
 
-  const isApproved = critique.status === 'approved' || critique.status === 'max_revisions_reached';
   const score = critique.score || 0;
   const issues = critique.issues || [];
   const suggestions = critique.suggestions || [];
-  const prefCoverage = critique.preference_coverage || {};
+  const coverage = critique.preference_coverage || {};
 
-  const getScoreColor = (s) => {
-    if (s >= 8) return '#10b981';
-    if (s >= 6) return '#f59e0b';
-    return '#ef4444';
-  };
+  const ringColor =
+    score >= 8 ? 'var(--ok)' : score >= 6 ? 'var(--warn)' : 'var(--bad)';
+
+  const approved =
+    critique.status === 'approved' || critique.status === 'max_revisions_reached';
 
   return (
-    <div className="critic-status glass-card" id="critic-status">
-      <h3 className="section-title">Quality Review</h3>
+    <div className="panel panel-pad" id="critic-status">
+      <p className="eyebrow">Quality review</p>
 
-      <div className="critic-header">
-        <div className="score-circle" style={{ '--score-color': getScoreColor(score) }}>
-          <span className="score-value">{score}</span>
-          <span className="score-max">/10</span>
+      <div className="score-row" style={{ marginTop: 'var(--s-5)' }}>
+        <div
+          className="score-ring"
+          style={{ '--pct': score * 10, '--ring-color': ringColor }}
+          role="img"
+          aria-label={`Quality score ${score} out of 10`}
+        >
+          <span className="score-inner">
+            <span className="score-num">{score}</span>
+            <span className="score-den">/10</span>
+          </span>
         </div>
-        <div className="critic-summary">
-          <span className={`status-badge ${isApproved ? 'approved' : 'rejected'}`}>
-            {critique.status === 'max_revisions_reached' ? 'Accepted' : critique.status.toUpperCase()}
+
+        <div className="score-text">
+          <span className={`status-pill is-enum ${approved ? 'within' : 'over'}`}>
+            {critique.status === 'max_revisions_reached' ? 'Accepted' : critique.status}
           </span>
           {critique.overall_assessment && (
-            <p className="assessment-text">{critique.overall_assessment}</p>
+            <p className="assessment">{critique.overall_assessment}</p>
           )}
         </div>
       </div>
 
-      {Object.keys(prefCoverage).length > 0 && (
-        <div className="pref-coverage">
-          <h4>Preference Coverage</h4>
-          <div className="pref-tags">
-            {Object.entries(prefCoverage).map(([pref, covered]) => (
-              <span key={pref} className={`pref-tag ${covered ? 'covered' : 'missing'}`}>
+      {Object.keys(coverage).length > 0 && (
+        <div className="sub-block">
+          <p className="sub-head">Your interests</p>
+          <div className="chips">
+            {Object.entries(coverage).map(([pref, covered]) => (
+              <span key={pref} className={`cov-tag ${covered ? 'yes' : 'no'}`}>
                 {pref}
               </span>
             ))}
@@ -46,13 +59,13 @@ export default function CriticStatus({ critique }) {
       )}
 
       {issues.length > 0 && (
-        <div className="critic-issues">
-          <h4>Issues ({issues.length})</h4>
-          <div className="issues-list">
-            {issues.map((issue, idx) => (
-              <div key={idx} className={`issue-item severity-${issue.severity}`}>
-                <span className={`issue-dot ${issue.severity}`}></span>
-                <span className="issue-text">{issue.issue}</span>
+        <div className="sub-block">
+          <p className="sub-head">Notes ({issues.length})</p>
+          <div>
+            {issues.map((issue, i) => (
+              <div className="issue" key={i}>
+                <span className={`issue-dot ${issue.severity}`} />
+                <span>{issue.issue}</span>
               </div>
             ))}
           </div>
@@ -60,9 +73,11 @@ export default function CriticStatus({ critique }) {
       )}
 
       {suggestions.length > 0 && (
-        <div className="critic-suggestions">
-          <h4>Suggestions</h4>
-          <ul>{suggestions.map((sug, idx) => <li key={idx}>{sug}</li>)}</ul>
+        <div className="sub-block">
+          <p className="sub-head">Suggestions</p>
+          <ul className="note-list">
+            {suggestions.map((s, i) => <li key={i}>{s}</li>)}
+          </ul>
         </div>
       )}
     </div>

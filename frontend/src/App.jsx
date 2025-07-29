@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import Hero from './components/Hero';
 import TripForm from './components/TripForm';
+import DestinationCard from './components/DestinationCard';
 import AgentProgress from './components/AgentProgress';
 import ItineraryView from './components/ItineraryView';
 import BudgetBreakdown from './components/BudgetBreakdown';
 import CriticStatus from './components/CriticStatus';
 import SourcesList from './components/SourcesList';
+import { DESTINATIONS } from './data/destinations';
+import { IconPin } from './components/icons';
 import { planTrip } from './api/tripApi';
 
 function App() {
@@ -12,6 +16,36 @@ function App() {
   const [currentStep, setCurrentStep] = useState(0);
   const [tripResult, setTripResult] = useState(null);
   const [error, setError] = useState(null);
+  const [stuck, setStuck] = useState(false);
+
+  /* Form state lives here so the destination cards and the planner bar
+     stay in sync — picking a card fills the bar and vice versa. */
+  const [form, setForm] = useState({
+    destination: '',
+    days: 3,
+    travelers: 2,
+    budget: 15000,
+    preferences: [],
+  });
+
+  const plannerRef = useRef(null);
+  const resultsRef = useRef(null);
+
+  // Frost the nav only after the page has scrolled past the hero top.
+  useEffect(() => {
+    const onScroll = () => setStuck(window.scrollY > 24);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const scrollToPlanner = () =>
+    plannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  const selectDestination = (name) => {
+    setForm((prev) => ({ ...prev, destination: name }));
+    scrollToPlanner();
+  };
 
   const handleSubmit = async (formData) => {
     setIsLoading(true);
@@ -19,11 +53,10 @@ function App() {
     setError(null);
     setCurrentStep(0);
 
+    // Optimistic stepper: the backend does not stream progress, so we
+    // advance on a timer that roughly matches observed agent timings.
     const progressInterval = setInterval(() => {
-      setCurrentStep((prev) => {
-        if (prev < 3) return prev + 1;
-        return prev;
-      });
+      setCurrentStep((prev) => (prev < 3 ? prev + 1 : prev));
     }, 8000);
 
     try {
@@ -31,6 +64,10 @@ function App() {
       clearInterval(progressInterval);
       setCurrentStep(4);
       setTripResult(result);
+      // Let the results paint before scrolling to them.
+      requestAnimationFrame(() =>
+        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+      );
     } catch (err) {
       clearInterval(progressInterval);
       setError(err.message || 'Something went wrong. Please try again.');
@@ -41,82 +78,129 @@ function App() {
 
   return (
     <div className="app">
-      <header className="hero">
-        <div className="hero-orbs">
-          <div className="orb orb-1"></div>
-          <div className="orb orb-2"></div>
-          <div className="orb orb-3"></div>
-        </div>
-        <div className="hero-content">
-          <p className="hero-eyebrow">AI-Powered Travel Planning</p>
-          <h1 className="hero-title">TripSaathi</h1>
-          <p className="hero-subtitle">
-            Intelligent multi-agent system that crafts personalized itineraries using RAG and LangGraph
-          </p>
-          <div className="hero-badges">
-            <span className="hero-badge">LangChain</span>
-            <span className="hero-badge">LangGraph</span>
-            <span className="hero-badge">RAG</span>
-            <span className="hero-badge">Multi-Agent</span>
+      <nav className={`nav ${stuck ? 'is-stuck' : ''}`}>
+        <div className="nav-inner">
+          <a className="brand" href="#top">
+            <span className="brand-mark"><IconPin /></span>
+            <span className="brand-name">Trip<em>Saathi</em></span>
+          </a>
+          <div className="nav-links">
+            <a className="nav-link" href="#destinations">Destinations</a>
+            <a className="nav-link" href="#how">How it works</a>
+            <button type="button" className="btn-ghost" onClick={scrollToPlanner}>
+              Plan a trip
+            </button>
           </div>
         </div>
-      </header>
+      </nav>
 
-      <main className="main-content">
-        <section className="section form-section">
-          <TripForm onSubmit={handleSubmit} isLoading={isLoading} />
+      <span id="top" />
+      <Hero onStart={scrollToPlanner} />
+
+      <div ref={plannerRef}>
+        <TripForm
+          form={form}
+          setForm={setForm}
+          onSubmit={handleSubmit}
+          isLoading={isLoading}
+        />
+      </div>
+
+      <main>
+        {/* --- Destination shelf --- */}
+        <section className="section" id="destinations">
+          <div className="shell">
+            <div className="section-head">
+              <p className="eyebrow">Where to</p>
+              <h2>Five places we know deeply.</h2>
+              <p className="lede">
+                Each one is backed by a curated knowledge base — opening hours,
+                real costs, and the walk between one place and the next.
+              </p>
+            </div>
+
+            <div className="dest-grid">
+              {DESTINATIONS.map((d) => (
+                <DestinationCard
+                  key={d.name}
+                  destination={d}
+                  isActive={form.destination === d.name}
+                  onSelect={selectDestination}
+                />
+              ))}
+            </div>
+          </div>
         </section>
 
-        {(isLoading || tripResult) && (
-          <section className="section">
-            <AgentProgress
-              currentStep={isLoading ? currentStep : 4}
-              isComplete={!!tripResult}
-              revisionCount={tripResult?.revision_count ? tripResult.revision_count - 1 : 0}
-            />
-          </section>
-        )}
-
-        {error && (
-          <section className="section">
-            <div className="error-card" id="error-card">
-              <div className="error-icon">!</div>
-              <div>
-                <h3>Request Failed</h3>
-                <p>{error}</p>
+        {/* --- Live results --- */}
+        <div ref={resultsRef}>
+          {(isLoading || tripResult) && (
+            <section className="section--tight" id="how">
+              <div className="shell reveal">
+                <AgentProgress
+                  currentStep={isLoading ? currentStep : 4}
+                  isComplete={!!tripResult}
+                  revisionCount={
+                    tripResult?.revision_count ? tripResult.revision_count - 1 : 0
+                  }
+                />
               </div>
-              <button onClick={() => setError(null)} className="error-dismiss">
-                Dismiss
-              </button>
-            </div>
-          </section>
-        )}
-
-        {tripResult && (
-          <>
-            <section className="section">
-              <BudgetBreakdown breakdown={tripResult.budget_breakdown} />
             </section>
+          )}
 
-            <section className="section">
-              <ItineraryView itinerary={tripResult.itinerary} />
+          {error && (
+            <section className="section--tight">
+              <div className="shell">
+                <div className="error-card reveal" id="error-card">
+                  <span className="error-icon">!</span>
+                  <div className="error-body">
+                    <h4>We couldn't build that plan</h4>
+                    <p>{error}</p>
+                  </div>
+                  <button className="error-dismiss" onClick={() => setError(null)}>
+                    Dismiss
+                  </button>
+                </div>
+              </div>
             </section>
+          )}
 
-            <div className="results-grid">
-              <section className="section">
-                <CriticStatus critique={tripResult.critique} />
+          {tripResult && (
+            <>
+              <section className="section--tight">
+                <div className="shell reveal">
+                  <BudgetBreakdown breakdown={tripResult.budget_breakdown} />
+                </div>
               </section>
 
-              <section className="section">
-                <SourcesList sources={tripResult.sources} />
+              <section className="section--tight">
+                <div className="shell reveal">
+                  <ItineraryView itinerary={tripResult.itinerary} />
+                </div>
               </section>
-            </div>
-          </>
-        )}
+
+              <section className="section--tight">
+                <div className="shell results-split reveal">
+                  <CriticStatus critique={tripResult.critique} />
+                  <SourcesList sources={tripResult.sources} />
+                </div>
+              </section>
+            </>
+          )}
+        </div>
       </main>
 
       <footer className="footer">
-        <p>Built with LangChain, LangGraph, RAG, FastAPI & React</p>
+        <div className="shell footer-inner">
+          <p>TripSaathi — multi-agent trip planning, grounded in real data.</p>
+          <div className="footer-stack">
+            <span>LangChain</span>
+            <span>LangGraph</span>
+            <span>RAG</span>
+            <span>FastAPI</span>
+            <span>React</span>
+          </div>
+        </div>
       </footer>
     </div>
   );

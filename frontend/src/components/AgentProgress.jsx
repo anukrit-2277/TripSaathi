@@ -1,59 +1,60 @@
+import { IconCheck } from './icons';
+
 const AGENT_STEPS = [
-  { id: 'destination', label: 'Destination Agent', description: 'Retrieving destination info from knowledge base...' },
-  { id: 'budget', label: 'Budget Agent', description: 'Estimating costs and budget allocation...' },
-  { id: 'itinerary', label: 'Itinerary Agent', description: 'Creating day-by-day travel plan...' },
-  { id: 'critic', label: 'Critic Agent', description: 'Reviewing itinerary quality...' },
+  { id: 'destination', label: 'Destination', description: 'Searching the knowledge base for places worth your time.' },
+  { id: 'budget',      label: 'Budget',      description: 'Costing stay, food, transport and entry fees.' },
+  { id: 'itinerary',   label: 'Itinerary',   description: 'Laying out the day-by-day plan.' },
+  { id: 'critic',      label: 'Review',      description: 'Checking pacing, budget and your interests.' },
 ];
 
 export default function AgentProgress({ currentStep, isComplete, revisionCount }) {
-  const getStepStatus = (index) => {
-    if (isComplete) return 'done';
-    if (index < currentStep) return 'done';
-    if (index === currentStep) return 'active';
+  const statusOf = (i) => {
+    if (isComplete || i < currentStep) return 'done';
+    if (i === currentStep) return 'active';
     return 'pending';
   };
 
   return (
-    <div className="agent-progress glass-card" id="agent-progress">
-      <h3 className="section-title">
-        {isComplete ? 'Planning Complete' : 'Agents Working'}
-      </h3>
+    <div className="panel progress-panel" id="agent-progress">
+      <div className="panel-head">
+        <div>
+          <p className="eyebrow">{isComplete ? 'Done' : 'Working'}</p>
+          <h3 style={{ marginTop: 'var(--s-3)' }}>
+            {isComplete ? 'Your plan is ready' : 'Building your trip'}
+          </h3>
+          {!isComplete && (
+            <p className="panel-sub">This usually takes about a minute.</p>
+          )}
+        </div>
+      </div>
 
-      <div className="progress-steps">
-        {AGENT_STEPS.map((step, index) => {
-          const status = getStepStatus(index);
+      <div className="progress-rail">
+        {AGENT_STEPS.map((step, i) => {
+          const status = statusOf(i);
           return (
-            <div key={step.id} className={`progress-step ${status}`} id={`step-${step.id}`}>
-              <div className="step-indicator">
-                {status === 'done' && (
-                  <svg className="step-icon-svg done" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                )}
-                {status === 'active' && <span className="step-spinner"></span>}
-                {status === 'pending' && <span className="step-dot"></span>}
+            <div className={`pstep ${status}`} key={step.id} id={`step-${step.id}`}>
+              <div className="pstep-top">
+                <span className="pstep-mark">
+                  {status === 'done' && <IconCheck />}
+                  {status === 'active' && <span className="spinner-ring" />}
+                  {status === 'pending' && <span className="dot-idle" />}
+                </span>
+                <span className="pstep-name">{step.label}</span>
               </div>
-              <div className="step-content">
-                <span className="step-label">{step.label}</span>
-                {status === 'active' && (
-                  <span className="step-description">{step.description}</span>
-                )}
-              </div>
+              {status === 'active' && (
+                <p className="pstep-desc">{step.description}</p>
+              )}
             </div>
           );
         })}
 
         {revisionCount > 0 && (
-          <div className="progress-step done" id="step-revision">
-            <div className="step-indicator">
-              <svg className="step-icon-svg done" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
+          <div className="pstep done" id="step-revision">
+            <div className="pstep-top">
+              <span className="pstep-mark"><IconCheck /></span>
+              <span className="pstep-name">Revision {revisionCount}</span>
             </div>
-            <div className="step-content">
-              <span className="step-label">Revision {revisionCount}</span>
-              <span className="step-description">Itinerary improved based on feedback</span>
-            </div>
+            <p className="pstep-desc">Improved after review feedback.</p>
           </div>
         )}
       </div>

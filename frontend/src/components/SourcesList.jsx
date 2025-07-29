@@ -1,16 +1,22 @@
+import { IconDoc } from './icons';
+
 export default function SourcesList({ sources }) {
-  if (!sources || sources.length === 0) return null;
+  if (!sources?.length) return null;
 
   return (
-    <div className="sources-list glass-card" id="sources-list">
-      <h3 className="section-title">RAG Sources</h3>
-      <div className="sources-tags">
-        {sources.map((source, idx) => (
-          <span key={idx} className="source-tag">{source}</span>
+    <div className="panel panel-pad" id="sources-list">
+      <p className="eyebrow">Sources</p>
+      <div className="chips" style={{ marginTop: 'var(--s-5)' }}>
+        {sources.map((source, i) => (
+          <span className="source-tag" key={i}>
+            <IconDoc />
+            {source}
+          </span>
         ))}
       </div>
       <p className="sources-note">
-        Information retrieved from the knowledge base using semantic search.
+        Retrieved from the travel knowledge base by semantic search, then used
+        as grounding context for every agent in the workflow.
       </p>
     </div>
   );

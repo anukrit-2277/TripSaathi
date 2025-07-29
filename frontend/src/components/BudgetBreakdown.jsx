@@ -1,61 +1,86 @@
-export default function BudgetBreakdown({ breakdown }) {
-  if (!breakdown || !breakdown.total_estimated) return null;
+import { IconWallet } from './icons';
 
-  const categories = [
-    { key: 'accommodation', label: 'Accommodation', color: '#7c5cfc' },
-    { key: 'food', label: 'Food & Dining', color: '#f59e0b' },
-    { key: 'transport', label: 'Transport', color: '#10b981' },
-    { key: 'activities', label: 'Activities', color: '#ec4899' },
-  ];
+const inr = (n) =>
+  n.toLocaleString('en-IN', {
+    style: 'currency', currency: 'INR', maximumFractionDigits: 0,
+  });
+
+/* Category colours are drawn from the palette, not picked at random —
+   clay, ochre, forest and a muted plum that still sits in the warm family. */
+const CATEGORIES = [
+  { key: 'accommodation', label: 'Stay',       color: '#C1502E' },
+  { key: 'food',          label: 'Food',       color: '#D99A2B' },
+  { key: 'transport',     label: 'Transport',  color: '#3F7D6C' },
+  { key: 'activities',    label: 'Activities', color: '#9A5B6E' },
+];
+
+export default function BudgetBreakdown({ breakdown }) {
+  if (!breakdown?.total_estimated) return null;
 
   const total = breakdown.total_estimated;
-  const budgetLimit = breakdown.budget_limit;
+  const limit = breakdown.budget_limit;
   const remaining = breakdown.remaining;
-  const withinBudget = breakdown.within_budget;
-  const percentage = Math.min((total / budgetLimit) * 100, 100);
+  const within = breakdown.within_budget;
+  const pct = Math.min((total / limit) * 100, 100);
 
   return (
-    <div className="budget-breakdown glass-card" id="budget-breakdown">
-      <h3 className="section-title">Budget Breakdown</h3>
-
-      <div className="budget-meter">
-        <div className="meter-header">
-          <span className="meter-label">
-            {total.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })} of {budgetLimit.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}
-          </span>
-          <span className={`meter-status ${withinBudget ? 'within' : 'over'}`}>
-            {withinBudget
-              ? `${Math.abs(remaining).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })} remaining`
-              : `${Math.abs(remaining).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })} over budget`}
-          </span>
-        </div>
-        <div className="meter-bar">
-          <div className={`meter-fill ${withinBudget ? 'within' : 'over'}`} style={{ width: `${percentage}%` }}></div>
+    <div className="panel panel-pad" id="budget-breakdown">
+      <div className="panel-head">
+        <div>
+          <p className="eyebrow">What it costs</p>
         </div>
       </div>
 
-      <div className="budget-categories">
-        {categories.map(({ key, label, color }) => {
+      <div className="budget-hero">
+        <div>
+          <div className="budget-total">{inr(total)}</div>
+          <div className="budget-of">estimated against a {inr(limit)} budget</div>
+        </div>
+        <span className={`status-pill ${within ? 'within' : 'over'}`}>
+          {within
+            ? `${inr(Math.abs(remaining))} to spare`
+            : `${inr(Math.abs(remaining))} over`}
+        </span>
+      </div>
+
+      <div className="meter">
+        <div
+          className={`meter-fill ${within ? 'within' : 'over'}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+
+      <div className="cat-list">
+        {CATEGORIES.map(({ key, label, color }) => {
           const cat = breakdown[key];
           if (!cat) return null;
+
           const catTotal = cat.total || 0;
-          const catPercent = total > 0 ? (catTotal / total) * 100 : 0;
+          const catPct = total > 0 ? (catTotal / total) * 100 : 0;
+
           return (
-            <div key={key} className="budget-category" id={`budget-${key}`}>
-              <div className="category-header">
-                <div className="category-color" style={{ backgroundColor: color }}></div>
-                <span className="category-label">{label}</span>
-                <span className="category-amount">{catTotal.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}</span>
-              </div>
-              <div className="category-bar">
-                <div className="category-fill" style={{ width: `${catPercent}%`, backgroundColor: color }}></div>
-              </div>
-              <div className="category-detail">
-                {key === 'accommodation' && cat.per_night > 0 && <span>{cat.per_night.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}/night &middot; {cat.nights} nights &middot; {cat.rooms} room(s)</span>}
-                {key === 'food' && cat.per_day_per_person > 0 && <span>{cat.per_day_per_person.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}/day/person &middot; {cat.days} days &middot; {cat.travelers} people</span>}
-                {key === 'transport' && cat.per_day > 0 && <span>{cat.per_day.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}/day &middot; {cat.days} days</span>}
-                {key === 'activities' && cat.items && <span>{cat.items.length} paid activities</span>}
-              </div>
+            <div className="cat" key={key} id={`budget-${key}`}>
+              <span className="cat-name">
+                <span className="cat-swatch" style={{ background: color }} />
+                {label}
+              </span>
+              <span className="cat-amount">{inr(catTotal)}</span>
+              <span className="cat-bar">
+                <span
+                  className="cat-bar-fill"
+                  style={{ width: `${catPct}%`, background: color }}
+                />
+              </span>
+              <span className="cat-detail">
+                {key === 'accommodation' && cat.per_night > 0 &&
+                  `${inr(cat.per_night)} a night · ${cat.nights} nights · ${cat.rooms} room(s)`}
+                {key === 'food' && cat.per_day_per_person > 0 &&
+                  `${inr(cat.per_day_per_person)} per person per day · ${cat.days} days`}
+                {key === 'transport' && cat.per_day > 0 &&
+                  `${inr(cat.per_day)} a day · ${cat.days} days`}
+                {key === 'activities' && cat.items &&
+                  `${cat.items.length} paid ${cat.items.length === 1 ? 'activity' : 'activities'}`}
+              </span>
             </div>
           );
         })}
