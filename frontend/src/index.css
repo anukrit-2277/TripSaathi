@@ -1103,6 +1103,20 @@ h1, h2, h3 { text-wrap: balance; }
 }
 .pstep.pending .pstep-name { color: var(--ink-400); }
 
+/* Live counter beside the "about a minute" copy. */
+.elapsed {
+  display: inline-flex;
+  align-items: center;
+  margin-left: var(--s-3);
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--r-sm);
+  background: var(--clay-50);
+  color: var(--clay-600);
+  font-size: var(--t-micro);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
 .spinner-ring {
   width: 15px; height: 15px;
   border: 2px solid var(--clay-100);

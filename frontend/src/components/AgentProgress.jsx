@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { IconCheck } from './icons';
 
 const AGENT_STEPS = [
@@ -8,6 +9,21 @@ const AGENT_STEPS = [
 ];
 
 export default function AgentProgress({ currentStep, isComplete, revisionCount }) {
+  /* A ticking counter during a ~60s wait. Without it the panel looks
+     identical at 5s and at 50s, which is when people assume it has hung
+     and hit the button again. Resets on each new run (isComplete flips
+     back to false), and stops the moment the plan lands. */
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (isComplete) return;
+    setElapsed(0);
+    const id = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [isComplete]);
+
+  const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
+
   const statusOf = (i) => {
     if (isComplete || i < currentStep) return 'done';
     if (i === currentStep) return 'active';
@@ -23,7 +39,10 @@ export default function AgentProgress({ currentStep, isComplete, revisionCount }
             {isComplete ? 'Your plan is ready' : 'Building your trip'}
           </h3>
           {!isComplete && (
-            <p className="panel-sub">This usually takes about a minute.</p>
+            <p className="panel-sub">
+              This usually takes about a minute.
+              <span className="elapsed tabular" aria-live="polite">{clock}</span>
+            </p>
           )}
         </div>
       </div>

@@ -42,6 +42,15 @@ function App() {
   const scrollToPlanner = () =>
     plannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
+  /* Bring the progress panel into view the moment planning begins.
+     This runs in an effect rather than inline in the submit handler
+     because the panel does not exist in the DOM until the isLoading
+     re-render has committed — scrolling before that is a no-op. */
+  useEffect(() => {
+    if (!isLoading) return;
+    resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [isLoading]);
+
   const selectDestination = (name) => {
     setForm((prev) => ({ ...prev, destination: name }));
     scrollToPlanner();
@@ -107,32 +116,11 @@ function App() {
       </div>
 
       <main>
-        {/* --- Destination shelf --- */}
-        <section className="section" id="destinations">
-          <div className="shell">
-            <div className="section-head">
-              <p className="eyebrow">Where to</p>
-              <h2>Five places we know deeply.</h2>
-              <p className="lede">
-                Each one is backed by a curated knowledge base — opening hours,
-                real costs, and the walk between one place and the next.
-              </p>
-            </div>
-
-            <div className="dest-grid">
-              {DESTINATIONS.map((d) => (
-                <DestinationCard
-                  key={d.name}
-                  destination={d}
-                  isActive={form.destination === d.name}
-                  onSelect={selectDestination}
-                />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* --- Live results --- */}
+        {/* --- Live results ---
+             Deliberately ABOVE the destination shelf. Progress has to
+             appear directly under the planner bar the user just clicked;
+             sitting below a full-height shelf of cards meant the button
+             produced no visible feedback at all. */}
         <div ref={resultsRef}>
           {(isLoading || tripResult) && (
             <section className="section--tight" id="how">
@@ -188,6 +176,31 @@ function App() {
             </>
           )}
         </div>
+
+        {/* --- Destination shelf --- */}
+        <section className="section" id="destinations">
+          <div className="shell">
+            <div className="section-head">
+              <p className="eyebrow">Where to</p>
+              <h2>Five places we know deeply.</h2>
+              <p className="lede">
+                Each one is backed by a curated knowledge base — opening hours,
+                real costs, and the walk between one place and the next.
+              </p>
+            </div>
+
+            <div className="dest-grid">
+              {DESTINATIONS.map((d) => (
+                <DestinationCard
+                  key={d.name}
+                  destination={d}
+                  isActive={form.destination === d.name}
+                  onSelect={selectDestination}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
       </main>
 
       <footer className="footer">
