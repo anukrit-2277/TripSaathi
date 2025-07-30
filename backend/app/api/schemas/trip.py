@@ -109,6 +109,16 @@ class TripResponse(BaseModel):
     status: str = Field(description="Workflow status: approved, rejected, max_revisions_reached")
     revision_count: int = Field(description="Number of revisions made")
 
+    shareable: bool = Field(
+        default=False,
+        description=(
+            "True when the trip row is committed to the database, and therefore "
+            "when GET /api/trip/{id} will still find it for someone opening a "
+            "share link. False means the trip lives only in this process's "
+            "memory, so a link would 404 on another worker or after a restart."
+        ),
+    )
+
 
 class ErrorResponse(BaseModel):
     """Standard error response."""

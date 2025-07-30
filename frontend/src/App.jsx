@@ -6,9 +6,10 @@ import AgentProgress from './components/AgentProgress';
 import ItineraryView from './components/ItineraryView';
 import BudgetBreakdown from './components/BudgetBreakdown';
 import CriticStatus from './components/CriticStatus';
+import ShareTrip from './components/ShareTrip';
 import { DESTINATIONS } from './data/destinations';
 import { IconPin } from './components/icons';
-import { planTrip } from './api/tripApi';
+import { planTrip, getTrip } from './api/tripApi';
 
 function App() {
   const [isLoading, setIsLoading] = useState(false);
@@ -16,6 +17,11 @@ function App() {
   const [tripResult, setTripResult] = useState(null);
   const [error, setError] = useState(null);
   const [stuck, setStuck] = useState(false);
+
+  /* A plan opened from a share link is read-only: no agent stepper to
+     replay, and a banner instead saying whose plan this is. */
+  const [sharedView, setSharedView] = useState(false);
+  const [loadingShared, setLoadingShared] = useState(false);
 
   /* Form state lives here so the destination cards and the planner bar
      stay in sync — picking a card fills the bar and vice versa. */
@@ -50,6 +56,50 @@ function App() {
     resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [isLoading]);
 
+  /* Keep ?trip=<id> in the address bar in step with what is on screen, so
+     a reload (or a copy of the browser URL) lands on the same plan. */
+  const syncTripParam = (tripId) => {
+    const url = new URL(window.location.href);
+    if (tripId) url.searchParams.set('trip', tripId);
+    else url.searchParams.delete('trip');
+    window.history.replaceState({}, '', url);
+  };
+
+  /* Open straight into a shared plan when the page is loaded with
+     ?trip=<id>. A query param rather than a /trip/<id> route: no router
+     here, and a path would need SPA-fallback rewrites on the host. */
+  useEffect(() => {
+    const tripId = new URLSearchParams(window.location.search).get('trip');
+    if (!tripId) return;
+
+    let cancelled = false;
+    setSharedView(true);
+    setLoadingShared(true);
+
+    getTrip(tripId)
+      .then((trip) => {
+        if (cancelled) return;
+        setTripResult(trip);
+        requestAnimationFrame(() =>
+          resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+        );
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(
+          `We couldn't open that shared plan. It may have expired or the link ` +
+          `may be incomplete. (${err.message})`,
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingShared(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const selectDestination = (name) => {
     setForm((prev) => ({ ...prev, destination: name }));
     scrollToPlanner();
@@ -60,6 +110,9 @@ function App() {
     setTripResult(null);
     setError(null);
     setCurrentStep(0);
+    // Planning something new replaces whatever shared plan was on screen.
+    setSharedView(false);
+    syncTripParam(null);
 
     // Optimistic stepper: the backend does not stream progress, so we
     // advance on a timer that roughly matches observed agent timings.
@@ -72,6 +125,7 @@ function App() {
       clearInterval(progressInterval);
       setCurrentStep(4);
       setTripResult(result);
+      if (result.shareable) syncTripParam(result.trip_id);
       // Let the results paint before scrolling to them.
       requestAnimationFrame(() =>
         resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
@@ -121,7 +175,43 @@ function App() {
              sitting below a full-height shelf of cards meant the button
              produced no visible feedback at all. */}
         <div ref={resultsRef}>
-          {(isLoading || tripResult) && (
+          {loadingShared && (
+            <section className="section--tight">
+              <div className="shell reveal">
+                <div className="panel panel-pad shared-loading">
+                  <span className="spinner-ring" />
+                  <p>Opening a shared plan…</p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {sharedView && tripResult && (
+            <section className="section--tight">
+              <div className="shell reveal">
+                <div className="shared-banner">
+                  <div className="shared-banner-copy">
+                    <p className="eyebrow">Shared with you</p>
+                    <h3>
+                      {tripResult.days} days in {tripResult.destination}
+                    </h3>
+                    <p className="shared-sub">
+                      Planned for {tripResult.travelers}{' '}
+                      {tripResult.travelers === 1 ? 'traveller' : 'travellers'} by
+                      TripSaathi's agents.
+                    </p>
+                  </div>
+                  <button type="button" className="btn-ghost" onClick={scrollToPlanner}>
+                    Plan your own trip
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* The agent stepper only makes sense for a plan being built here —
+              replaying it for someone opening a link would be theatre. */}
+          {(isLoading || (tripResult && !sharedView)) && (
             <section className="section--tight" id="how">
               <div className="shell reveal">
                 <AgentProgress
@@ -171,6 +261,18 @@ function App() {
                   <CriticStatus critique={tripResult.critique} />
                 </div>
               </section>
+
+              {tripResult.shareable && (
+                <section className="section--tight">
+                  <div className="shell reveal">
+                    <ShareTrip
+                      tripId={tripResult.trip_id}
+                      destination={tripResult.destination}
+                      days={tripResult.days}
+                    />
+                  </div>
+                </section>
+              )}
             </>
           )}
         </div>

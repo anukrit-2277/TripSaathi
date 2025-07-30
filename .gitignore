@@ -17,6 +17,7 @@ venv/
 .venv/
 env/
 
+TripSaathi_Project_Documentation.md
 # --- Environment Variables (SECRETS!) ---
 .env
 *.env.local

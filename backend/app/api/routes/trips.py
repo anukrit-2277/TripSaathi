@@ -121,26 +121,11 @@ async def plan_trip(request: TripRequest) -> TripResponse:
         itinerary = result.get("itinerary", {})
         budget_breakdown = result.get("budget_breakdown", {})
 
-        response = TripResponse(
-            trip_id=trip_id,
-            destination=request.destination,
-            days=request.days,
-            travelers=request.travelers,
-            total_estimated_cost=budget_breakdown.get("total_estimated", 0),
-            within_budget=budget_breakdown.get("within_budget", False),
-            itinerary=itinerary,
-            budget_breakdown=budget_breakdown,
-            critique=result.get("critique", {}),
-            recommendations=itinerary.get("recommendations", []),
-            sources=sources,
-            status=result.get("status", "unknown"),
-            revision_count=result.get("revision_count", 0),
-        )
-
-        # Store in memory (always available)
-        _trip_store[trip_id] = response
-
-        # Also persist to database (if available)
+        # Persist BEFORE building the response: whether the row actually
+        # committed decides if we can offer a share link. A trip that only
+        # lives in _trip_store would 404 for anyone opening the link, since
+        # that dict is per-process and dies with the worker.
+        persisted = False
         try:
             async for db in get_db():
                 await crud.create_trip(
@@ -159,9 +144,33 @@ async def plan_trip(request: TripRequest) -> TripResponse:
                     status=result.get("status", "unknown"),
                     revision_count=result.get("revision_count", 0),
                 )
+                persisted = True
                 break
         except Exception as db_err:
-            logger.warning(f"⚠️ DB save failed (trip still returned): {db_err}")
+            logger.warning(
+                f"⚠️ DB save failed — trip still returned, but it will not be "
+                f"shareable: {db_err}"
+            )
+
+        response = TripResponse(
+            trip_id=trip_id,
+            destination=request.destination,
+            days=request.days,
+            travelers=request.travelers,
+            total_estimated_cost=budget_breakdown.get("total_estimated", 0),
+            within_budget=budget_breakdown.get("within_budget", False),
+            itinerary=itinerary,
+            budget_breakdown=budget_breakdown,
+            critique=result.get("critique", {}),
+            recommendations=itinerary.get("recommendations", []),
+            sources=sources,
+            status=result.get("status", "unknown"),
+            revision_count=result.get("revision_count", 0),
+            shareable=persisted,
+        )
+
+        # Cache in memory so a reload served by this same worker is instant.
+        _trip_store[trip_id] = response
 
         logger.info(
             f"✅ Trip plan generated. ID: {trip_id}, "
@@ -230,6 +239,8 @@ async def get_trip(trip_id: str) -> TripResponse:
                     sources=[f"travel_data/{db_trip.destination.lower()}.md"],
                     status=db_trip.status,
                     revision_count=db_trip.revision_count,
+                    # It came out of the database, so the link demonstrably works.
+                    shareable=True,
                 )
                 _trip_store[trip_id] = response  # Cache it
                 return response

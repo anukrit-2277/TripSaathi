@@ -1659,6 +1659,124 @@ h1, h2, h3 { text-wrap: balance; }
 
 
 /* ============================================================
+   13b  SHARING
+   ============================================================ */
+
+.share-card { background: linear-gradient(180deg, var(--clay-50) 0%, var(--surface) 62%); }
+
+.share-head { display: flex; align-items: flex-start; gap: var(--s-4); }
+.share-mark {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: var(--clay-500);
+  color: var(--sand-50);
+  display: grid; place-items: center;
+  flex: none;
+  box-shadow: var(--sh-glow);
+}
+.share-mark svg { width: 17px; height: 17px; }
+.share-lede {
+  margin-top: var(--s-2);
+  font-size: var(--t-sm);
+  color: var(--ink-600);
+  line-height: 1.6;
+  max-width: 46ch;
+}
+
+.share-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-top: var(--s-5);
+  flex-wrap: wrap;
+}
+
+/* The link field is a read-only input rather than plain text so the URL
+   stays selectable when the clipboard API is unavailable. */
+.share-link {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex: 1 1 320px;
+  min-width: 0;
+  padding: 0.7rem var(--s-4);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  border: 1px solid var(--sand-200);
+}
+.share-link svg { width: 16px; height: 16px; color: var(--ink-400); flex: none; }
+.share-link input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--t-xs);
+  color: var(--ink-700);
+  text-overflow: ellipsis;
+}
+.share-link input:focus { outline: none; }
+.share-link:focus-within { border-color: var(--clay-300); }
+
+.share-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0.8rem 1.5rem;
+  border-radius: var(--r-pill);
+  background: var(--clay-500);
+  color: var(--sand-50);
+  font-size: var(--t-sm);
+  font-weight: 700;
+  flex: none;
+  transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
+}
+.share-copy:hover { background: var(--clay-600); transform: translateY(-1px); }
+.share-copy:active { transform: translateY(0); }
+.share-copy.is-copied { background: var(--ok); }
+.share-copy svg { width: 14px; height: 14px; }
+
+.share-native { background: var(--surface); flex: none; }
+
+.share-warn {
+  margin-top: var(--s-3);
+  font-size: var(--t-xs);
+  color: var(--clay-700);
+}
+
+/* --- Viewing someone else's plan --- */
+
+.shared-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-5);
+  flex-wrap: wrap;
+  padding: var(--s-5) var(--s-6);
+  border-radius: var(--r-xl);
+  background: var(--forest-100);
+  border: 1px solid #C9DED6;
+}
+.shared-banner-copy h3 {
+  margin-top: var(--s-2);
+  font-size: var(--t-h3);
+  color: var(--forest-900);
+}
+.shared-sub {
+  margin-top: var(--s-1);
+  font-size: var(--t-sm);
+  color: var(--forest-700);
+}
+
+.shared-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+.shared-loading p { font-size: var(--t-sm); color: var(--ink-600); }
+
+
+/* ============================================================
    14  RESPONSIVE
    ============================================================ */
 
@@ -1715,6 +1833,10 @@ h1, h2, h3 { text-wrap: balance; }
      between items already does the separating on narrow screens. */
   .day-counts { gap: var(--s-2) var(--s-4); }
   .day-counts .sep { display: none; }
+  .share-link { flex-basis: 100%; }
+  .share-copy, .share-native { flex: 1 1 auto; justify-content: center; }
+  .shared-banner { flex-direction: column; align-items: flex-start; }
+
   .footer-inner { flex-direction: column; align-items: flex-start; }
 }
 
