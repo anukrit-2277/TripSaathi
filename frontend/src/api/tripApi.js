@@ -1,8 +1,23 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-
 /**
  * API client for TripSaathi backend.
  */
+
+/* Where the API lives.
+ *
+ * VITE_API_BASE_URL still wins when it is set, but the fallback is now
+ * environment-aware instead of always localhost. Vite inlines these at BUILD
+ * time, so a production bundle built without the variable — a missing env var
+ * on the host, a preview deploy, a fresh clone — used to ship pointing at the
+ * developer's own machine and fail for every visitor with "Could not reach
+ * the server". Baking the deployed URL in as the production default makes the
+ * env var an override rather than a requirement.
+ */
+const PROD_API_BASE_URL = 'https://tripsaathi-390970881686.asia-south1.run.app';
+
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL?.trim() ||
+  (import.meta.env.PROD ? PROD_API_BASE_URL : 'http://localhost:8000')
+).replace(/\/+$/, '');  // a trailing slash would double up against '/api/...'
 
 export async function planTrip(tripData) {
   // The backend workflow can take 60-180s. We give it up to 4 minutes,
