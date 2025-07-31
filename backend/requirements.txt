@@ -7,6 +7,18 @@
 # ChromaDB bundles its own FastAPI version requirement.
 # ============================================================
 
+# --- Torch: CPU-only wheel (MUST stay above sentence-transformers) ---
+# sentence-transformers pulls torch in transitively. On Linux, PyPI's default
+# torch wheel is the CUDA build — ~2.5GB of nvidia-* packages that are dead
+# weight on Cloud Run, and enough to blow past the build's disk and time
+# limits. PyTorch's CPU index publishes the same versions tagged "+cpu", and
+# a PEP 440 local version sorts above the plain one, so pip prefers it.
+#
+# On macOS this line is a no-op: the CPU index has no macOS wheels, so pip
+# falls through to PyPI, whose macOS wheels are CPU-only anyway.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.0
+
 # --- Web Framework ---
 # FastAPI: Modern async web framework with automatic OpenAPI docs.
 # Why FastAPI over Flask?
